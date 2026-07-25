@@ -125,21 +125,25 @@ app.get('/health', (req,res) => {
  *       400:
  *         description: Invalid request body
  */
- app.post('/tasks', (req, res) =>{
-         const {title, done} = req.body
-         if (!title || typeof done !== 'boolean' || title.trim() === '') {
-            return res.status(400).json({error : "Needs a title and done status"})
-            }
-            const newTask = {
-    id: tasks.length+1,
-    title: title,
-    done: done
-}
-tasks.push(newTask)
-res.status(201).json(newTask)
+app.post('/tasks', (req, res) => {
+    const { title } = req.body
 
-        }
-            )
+    if (!title || title.trim() === '') {
+        return res.status(400).json({
+            error: "Title is required"
+        })
+    }
+
+    const newTask = {
+        id: tasks.length + 1,
+        title: title,
+        done: false
+    }
+
+    tasks.push(newTask)
+
+    res.status(201).json(newTask)
+})
   /**
  * @swagger
  * /tasks/{id}:
@@ -182,10 +186,13 @@ app.put('/tasks/:id', (req, res) => {
         })
     }
     const { title, done } = req.body
-    if ((title !== undefined && title.trim() === '') ||
-        (done !== undefined && typeof done !== 'boolean')) {
+    if (
+        (title !== undefined && typeof title !== "string") ||
+        (title !== undefined && title.trim() === "") ||
+        (done !== undefined && typeof done !== "boolean")
+    ) {
         return res.status(400).json({
-            error: 'Invalid request body.'
+            error: "Invalid request body."
         })
     }
 
