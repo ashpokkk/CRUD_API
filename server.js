@@ -3,6 +3,7 @@ const swaggerSpec = require("./swagger")
 const express = require('express')
 const app = express()
 const port = 3000
+const db = require('./db')
 
 app.use(express.json())
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec))
