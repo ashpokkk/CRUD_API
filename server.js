@@ -4,7 +4,7 @@ const express = require('express')
 const app = express()
 const port = 3000
 
-const { getTasks, getTasksbyID , insertTask} = require('./db')
+const { getTasks, getTasksbyID , insertTask, updateTask, deleteTask} = require('./db')
 
 
 app.use(express.json())
@@ -140,17 +140,14 @@ app.put('/tasks/:id',(req,res)=>{
     }
 
 
-    if(title !== undefined){
-        task.title=title
-    }
+   const newTitle = title !== undefined ? title : task.title
+    const newDone = done !== undefined ? done : task.done
 
+    updateTask.run(newTitle, newDone ? 1 : 0, id)
 
-    if(done !== undefined){
-        task.done=done
-    }
+    const updatedTask = getTasksbyID.get(id)
 
-
-    res.json(task)
+    res.json(updatedTask)
 
 })
 
@@ -166,22 +163,15 @@ app.delete('/tasks/:id',(req,res)=>{
 
     const id = Number(req.params.id)
 
+    const task = getTasksbyID.get(id)
 
-    const index = tasks.findIndex(
-        t=>t.id===id
-    )
-
-
-    if(index===-1){
-
+    if (!task) {
         return res.status(404).json({
-            error:"Task not found"
+            error: "Task not found"
         })
-
     }
 
-
-    tasks.splice(index,1)
+    deleteTask.run(id)
 
     res.sendStatus(204)
 
