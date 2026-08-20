@@ -4,7 +4,7 @@ const express = require('express')
 const app = express()
 const port = 3000
 
-const { getTasks, getTasksbyID } = require('./db')
+const { getTasks, getTasksbyID , insertTask} = require('./db')
 
 
 app.use(express.json())
@@ -93,14 +93,9 @@ app.post('/tasks', (req,res)=>{
     }
 
 
-    const newTask = {
-        id: tasks.length + 1,
-        title:title,
-        done:false
-    }
+    const result = insertTask.run(title, 0)
 
-
-    tasks.push(newTask)
+    const newTask = getTasksbyID.get(result.lastInsertRowid)
 
     res.status(201).json(newTask)
 

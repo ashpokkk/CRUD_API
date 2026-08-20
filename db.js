@@ -15,7 +15,7 @@ const row = db.prepare('SELECT COUNT(*) as count FROM tasks').get();
 
 const getTasks = db.prepare('SELECT * FROM tasks');
 const getTasksbyID = db.prepare('SELECT * FROM tasks WHERE id = ?');
-
+const insertTask = db.prepare('INSERT INTO tasks (title, done) VALUES (?,?)');
 if (row.count === 0) {
     const insert = db.prepare('INSERT INTO tasks (title, done) VALUES (?,?)');
     insert.run('Read Quran', 1);
@@ -26,4 +26,4 @@ if (row.count === 0) {
 else{
     console.log(`Table already has ${row.count} tasks. No need for seed example`);
 }
-module.exports = { db, getTasks, getTasksbyID };
+module.exports = { db, getTasks, getTasksbyID , insertTask};
