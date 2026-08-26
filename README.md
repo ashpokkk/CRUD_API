@@ -1,194 +1,277 @@
 # Task API — CRUD API
 
-A simple REST API built using **Node.js** and **Express.js** that manages a to-do task list.
+A REST API built using **Node.js** and **Express.js** that manages a to-do task list.
 
 This project demonstrates the four main CRUD operations:
 
-* Create
-* Read
-* Update
-* Delete
+- Create
+- Read
+- Update
+- Delete
 
-The API uses **SQLite** for persistent data storage. Tasks are stored in a local `tasks.db` database file, so data remains available even after the server is restarted.
+The API uses **PostgreSQL** for persistent data storage. PostgreSQL runs inside Docker, while **Docker Compose** manages the API and database together.
 
 ---
 
 # Features
 
-* RESTful API endpoints
-* Create new tasks
-* Retrieve all tasks
-* Retrieve a single task by ID
-* Update existing tasks
-* Delete tasks
-* SQLite database persistence
-* Automatic database and table creation
-* Three seed tasks on the first run
-* Request validation
-* Proper HTTP status codes
-* Parameterized SQL queries
-* Interactive Swagger API documentation
+- RESTful API endpoints
+- Create new tasks
+- Retrieve all tasks
+- Retrieve a single task by ID
+- Update existing tasks
+- Delete tasks
+- PostgreSQL database persistence
+- Dockerized PostgreSQL database
+- Docker Compose for the complete application stack
+- Automatic database and table creation
+- Three seed tasks on the first run
+- Request validation
+- Proper HTTP status codes
+- Parameterized SQL queries
+- Interactive Swagger API documentation
+- Persistent Docker volume for database data
+- Environment-based database configuration
 
 ---
 
 # Technologies Used
 
-* Node.js
-* Express.js
-* SQLite
-* better-sqlite3
-* Swagger UI Express
-* Swagger JSDoc
+- Node.js
+- Express.js
+- PostgreSQL
+- `pg`
+- Docker
+- Docker Compose
+- Swagger UI Express
+- Swagger JSDoc
 
 ---
 
-# Database
+# Architecture
 
-The application uses a SQLite database named:
+The application consists of two Docker Compose services:
 
 ```text
-tasks.db
-```
+Client
+  │
+  │ HTTP requests
+  ▼
+Node.js + Express API
+  │
+  │ DATABASE_URL
+  ▼
+PostgreSQL
+  │
+  ▼
+Docker persistent volume
 
-The database and `tasks` table are created automatically when the server starts.
 
-The `tasks` table contains the following fields:
 
-| Column       | Type     | Description                    |
-| ------------ | -------- | ------------------------------ |
-| `id`         | INTEGER  | Primary key                    |
-| `title`      | TEXT     | Task title                     |
-| `done`       | INTEGER  | Task completion status         |
-| `created_at` | DATETIME | Time the task was created      |
-| `updated_at` | DATETIME | Time the task was last updated |
 
-On the first run, if the table is empty, the application creates three example tasks.
+The API connects to PostgreSQL using the Docker Compose service name db.
 
-The seed tasks are only inserted when the table contains no tasks. Existing data is not replaced when the server restarts.
+Database
 
----
+The application uses PostgreSQL with a database named:
 
-# Installation
+tasks
 
-## 1. Clone the repository
+The tasks table contains:
 
-```bash
-git clone https://github.com/ashpokkk/CRUD_API.git
-```
+Column	Type	Description
+id	SERIAL PRIMARY KEY	Unique task ID
+title	TEXT	Task title
+done	BOOLEAN	Task completion status
+created_at	TIMESTAMP	Time the task was created
+updated_at	TIMESTAMP	Time the task was last updated
 
-## 2. Navigate into the project
+When the application starts, the repository:
 
-```bash
-cd CRUD_API
-```
+Connects to PostgreSQL using DATABASE_URL.
+Creates the tasks table if it does not exist.
+Inserts three example tasks only if the table is empty.
 
-## 3. Install dependencies
+The seed tasks are only inserted when the table contains no tasks. Existing data is not replaced when the application restarts.
 
-```bash
-npm install
-```
+Environment Variables
 
----
+Database configuration is provided through the DATABASE_URL environment variable.
 
-# Running the Server
+Create a .env file using .env.example as a template:
 
-Start the server using:
+DATABASE_URL=postgres://postgres:dev@localhost:5432/tasks
 
-```bash
-node server.js
-```
+The real .env file is ignored by Git and should not be committed.
+
+When the application runs inside Docker Compose, the API uses:
+
+postgres://postgres:dev@db:5432/tasks
+
+The hostname is db because db is the PostgreSQL service name inside the Docker Compose network.
+
+Running the Application
+
+The complete application stack can be started with one command:
+
+docker compose up -d
+
+Check the services:
+
+docker compose ps
 
 The API will be available at:
 
-```text
 http://localhost:3000
-```
 
-The SQLite database file `tasks.db` will be created automatically if it does not already exist.
+Swagger documentation is available at:
 
----
-
-# API Endpoints
-
-| Method | Endpoint     | Description             |
-| ------ | ------------ | ----------------------- |
-| GET    | `/tasks`     | Retrieve all tasks      |
-| GET    | `/tasks/:id` | Retrieve a single task  |
-| POST   | `/tasks`     | Create a new task       |
-| PUT    | `/tasks/:id` | Update an existing task |
-| DELETE | `/tasks/:id` | Delete a task           |
-| GET    | `/health`    | Check API health        |
-
-Successful requests use the appropriate HTTP status codes, including:
-
-* `200` — Successful read/update
-* `201` — Task successfully created
-* `204` — Task successfully deleted
-* `400` — Invalid request
-* `404` — Task not found
-
----
-
-# SQLite Persistence
-
-Unlike the previous in-memory version of the API, this version stores tasks in SQLite.
-
-CRUD operations use SQL statements to interact with the database:
-
-* `SELECT` is used to retrieve tasks.
-* `INSERT` is used to create tasks.
-* `UPDATE` is used to modify tasks.
-* `DELETE` is used to remove tasks.
-
-SQL queries use **parameterized placeholders** instead of directly inserting user input into SQL statements.
-
-Because the data is stored in `tasks.db`, changes remain after the server is stopped and restarted.
-
----
-
-# Swagger Documentation
-
-Interactive API documentation is available through Swagger UI at:
-
-```text
 http://localhost:3000/docs
-```
 
-Swagger provides an interactive interface for viewing and testing all available API endpoints.
+To stop the stack:
 
-![Swagger API screenshot](./image.png)
+docker compose down
+API Endpoints
+Method	Endpoint	Description
+GET	/	API information
+GET	/health	Check API health
+GET	/tasks	Retrieve all tasks
+GET	/tasks/:id	Retrieve a single task
+POST	/tasks	Create a new task
+PUT	/tasks/:id	Update an existing task
+DELETE	/tasks/:id	Delete a task
+HTTP Status Codes
+200 — Successful read/update
+201 — Task successfully created
+204 — Task successfully deleted
+400 — Invalid request
+404 — Task not found
+Example Requests
+Get all tasks
+curl -i http://localhost:3000/tasks
 
----
+Example response:
 
-# Database Browser Screenshot
+[
+  {
+    "id": 1,
+    "title": "Read Quran",
+    "done": true
+  },
+  {
+    "id": 2,
+    "title": "Push up day workout",
+    "done": false
+  },
+  {
+    "id": 3,
+    "title": "Give fifi a bath",
+    "done": false
+  }
+]
+Create a task
+curl -X POST http://localhost:3000/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Learn PostgreSQL"}'
+Update a task
+curl -X PUT http://localhost:3000/tasks/1 \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Learn PostgreSQL properly","done":true}'
+Delete a task
+curl -i -X DELETE http://localhost:3000/tasks/1
+PostgreSQL Persistence
 
-The SQLite database can also be inspected manually using **DB Browser for SQLite**.
+The PostgreSQL database uses a Docker volume named:
 
-The screenshot below shows the `tasks` table and its stored data:
+taskdata
 
-![SQLite database screenshot](./SQl.png)
+The volume allows database data to survive when the containers are stopped and recreated.
 
----
+For example:
 
-# Project Structure
+docker compose down
+docker compose up -d
 
-```text
-CRUD_API/
+Tasks created before the restart remain available after the application starts again.
+
+This was tested by creating a task, stopping the entire Compose stack, starting it again, and confirming that the task was still present.
+
+SQL and Repository
+
+All PostgreSQL database operations are kept inside the repository module.
+
+CRUD operations use SQL statements:
+
+SELECT — retrieve tasks
+INSERT — create tasks
+UPDATE — modify tasks
+DELETE — remove tasks
+
+Queries use parameterized placeholders such as $1, $2, and $3 instead of directly inserting user input into SQL statements.
+
+Swagger Documentation
+
+Interactive API documentation is available through Swagger UI:
+
+http://localhost:3000/docs
+
+Swagger provides an interactive interface for viewing and testing the available API endpoints.
+
+Database Evidence
+
+PostgreSQL can be inspected directly inside the database container:
+
+docker compose exec db psql -U postgres -d tasks
+
+List the tables:
+
+\dt
+
+View the stored tasks:
+
+SELECT * FROM tasks;
+
+The database was verified to contain the tasks table and the seeded task data.
+
+Project Structure
+CRUD/
 │
 ├── server.js
-├── db.js
-├── tasks.db
+├── postgres.js
+├── postgresRepository.js
+├── swagger.js
+├── Dockerfile
+├── compose.yaml
+├── init.sql
+├── .env.example
+├── .gitignore
+├── .dockerignore
 ├── package.json
 ├── package-lock.json
 ├── README.md
 ├── image.png
 └── database-screenshot.png
-```
+One-Command Setup
 
----
+After cloning the repository:
 
-# Repository
+git clone https://github.com/ashpokkk/CRUD_API.git
+cd CRUD_API
+cp .env.example .env
+docker compose up -d
+
+The API and PostgreSQL database will start together without requiring manual database setup.
+
+Repository
 
 GitHub repository:
 
-https://github.com/ashpokkk/CRUD_API.git
+https://github.com/ashpokkk/CRUD_API
+
+
+### One small adjustment
+
+I used:
+
+```markdown
+![PostgreSQL database screenshot](./PostgresSQL(Docker Desktop).png)
