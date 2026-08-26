@@ -4,7 +4,13 @@ const express = require('express')
 const app = express()
 const port = 3000
 
-const { getTasks, getTasksbyID , insertTask, updateTask, deleteTask} = require('./db')
+const {
+    getTasks,
+    getTasksbyID,
+    insertTask,
+    updateTask,
+    deleteTask
+} = require('./postgresRepository')
 
 
 app.use(express.json())
@@ -29,13 +35,11 @@ app.get('/', (req, res) => {
  *       200:
  *         description: List of all tasks
  */
-app.get('/tasks', (req, res) => {
+app.get('/tasks', async (req, res) => {
+    const tasks = await getTasks();
 
-    const tasks = getTasks.all()
-
-    res.json(tasks)
-
-})
+    res.json(tasks);
+});
 
 
 /**
@@ -44,21 +48,19 @@ app.get('/tasks', (req, res) => {
  *   get:
  *     summary: Get a task by ID
  */
-app.get('/tasks/:id', (req, res) => {
+app.get('/tasks/:id', async (req, res) => {
+    const id = Number(req.params.id);
 
-    const id = Number(req.params.id)
-
-    const task = getTasksbyID.get(id)
+    const task = await getTasksbyID(id);
 
     if (!task) {
         return res.status(404).json({
             error: "Task not found"
-        })
+        });
     }
 
-    res.json(task)
-
-})
+    res.json(task);
+});
 
 
 /**
@@ -82,24 +84,19 @@ app.get('/health', (req,res)=>{
  *   post:
  *     summary: Create a new task
  */
-app.post('/tasks', (req,res)=>{
+app.post('/tasks', async (req, res) => {
+    const { title } = req.body;
 
-    const { title } = req.body
-
-    if(!title || title.trim() === ""){
+    if (!title || title.trim() === "") {
         return res.status(400).json({
-            error:"Title is required"
-        })
+            error: "Title is required"
+        });
     }
 
+    const newTask = await insertTask(title, false);
 
-    const result = insertTask.run(title, 0)
-
-    const newTask = getTasksbyID.get(result.lastInsertRowid)
-
-    res.status(201).json(newTask)
-
-})
+    res.status(201).json(newTask);
+});
 
 
 /**
@@ -108,48 +105,36 @@ app.post('/tasks', (req,res)=>{
  *   put:
  *     summary: Update a task
  */
-app.put('/tasks/:id',(req,res)=>{
+app.put('/tasks/:id', async (req, res) => {
+    const id = Number(req.params.id);
 
-    const id = Number(req.params.id)
+    const task = await getTasksbyID(id);
 
-    const task = tasks.find(t=>t.id===id)
-
-
-    if(!task){
-
+    if (!task) {
         return res.status(404).json({
-            error:"Task not found"
-        })
-
+            error: "Task not found"
+        });
     }
 
+    const { title, done } = req.body;
 
-    const {title,done}=req.body
-
-
-    if(
+    if (
         (title !== undefined && typeof title !== "string") ||
-        (title !== undefined && title.trim()==="") ||
+        (title !== undefined && title.trim() === "") ||
         (done !== undefined && typeof done !== "boolean")
-    ){
-
+    ) {
         return res.status(400).json({
-            error:"Invalid request body"
-        })
-
+            error: "Invalid request body"
+        });
     }
 
+    const newTitle = title !== undefined ? title : task.title;
+    const newDone = done !== undefined ? done : task.done;
 
-   const newTitle = title !== undefined ? title : task.title
-    const newDone = done !== undefined ? done : task.done
+    const updatedTask = await updateTask(id, newTitle, newDone);
 
-    updateTask.run(newTitle, newDone ? 1 : 0, id)
-
-    const updatedTask = getTasksbyID.get(id)
-
-    res.json(updatedTask)
-
-})
+    res.json(updatedTask);
+});
 
 
 /**
@@ -158,24 +143,21 @@ app.put('/tasks/:id',(req,res)=>{
  *   delete:
  *     summary: Delete a task
  */
-app.delete('/tasks/:id',(req,res)=>{
+app.delete('/tasks/:id', async (req, res) => {
+    const id = Number(req.params.id);
 
-
-    const id = Number(req.params.id)
-
-    const task = getTasksbyID.get(id)
+    const task = await getTasksbyID(id);
 
     if (!task) {
         return res.status(404).json({
             error: "Task not found"
-        })
+        });
     }
 
-    deleteTask.run(id)
+    await deleteTask(id);
 
-    res.sendStatus(204)
-
-})
+    res.sendStatus(204);
+});
 
 
 
