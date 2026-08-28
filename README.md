@@ -1,277 +1,497 @@
-# Task API — CRUD API
+# Task API — CRUD & Supabase Authentication API
 
-A REST API built using **Node.js** and **Express.js** that manages a to-do task list.
+A REST API built with **Node.js** and **Express.js** for managing tasks, with **PostgreSQL** persistence and **Supabase Authentication**.
 
-This project demonstrates the four main CRUD operations:
+The project demonstrates:
 
-- Create
-- Read
-- Update
-- Delete
-
-The API uses **PostgreSQL** for persistent data storage. PostgreSQL runs inside Docker, while **Docker Compose** manages the API and database together.
-
----
-
-# Features
-
-- RESTful API endpoints
-- Create new tasks
-- Retrieve all tasks
-- Retrieve a single task by ID
-- Update existing tasks
-- Delete tasks
-- PostgreSQL database persistence
-- Dockerized PostgreSQL database
-- Docker Compose for the complete application stack
-- Automatic database and table creation
-- Three seed tasks on the first run
-- Request validation
-- Proper HTTP status codes
-- Parameterized SQL queries
-- Interactive Swagger API documentation
-- Persistent Docker volume for database data
-- Environment-based database configuration
+* CRUD operations for tasks
+* User registration and login
+* JWT-based authentication
+* Protected API routes
+* Reusable authentication middleware
+* Supabase token verification
+* Logout functionality
+* Interactive Swagger API documentation
+* PostgreSQL persistence using Docker
 
 ---
 
-# Technologies Used
+## Features
 
-- Node.js
-- Express.js
-- PostgreSQL
-- `pg`
-- Docker
-- Docker Compose
-- Swagger UI Express
-- Swagger JSDoc
+### Task Management
+
+* Create new tasks
+* Retrieve all tasks
+* Retrieve a single task by ID
+* Update existing tasks
+* Delete tasks
+* PostgreSQL database persistence
+* Three seed tasks on the first run
+* Request validation
+* Proper HTTP status codes
+* Parameterized SQL queries
+
+### Authentication
+
+* User signup with Supabase
+* User login with email and password
+* JWT access tokens
+* Access-token verification through Supabase
+* Reusable authentication middleware
+* Protected API endpoints
+* User profile endpoint
+* Protected dashboard endpoint
+* Protected logout endpoint
+* Invalid and expired token handling
+* Public and protected routes
+
+### Documentation
+
+* Interactive Swagger UI
+* Bearer JWT authentication in Swagger
+* Swagger Authorize button
+* Protected-route lock icons
+* Try it out support for authenticated endpoints
 
 ---
 
-# Architecture
+## Technologies Used
 
-The application consists of two Docker Compose services:
+* Node.js
+* Express.js
+* PostgreSQL
+* `pg`
+* Supabase
+* `@supabase/supabase-js`
+* Docker
+* Docker Compose
+* Swagger UI Express
+* Swagger JSDoc
+
+---
+
+## Architecture
+
+The application consists of the Express API, PostgreSQL database, and Supabase Authentication.
 
 ```text
-Client
-  │
-  │ HTTP requests
-  ▼
-Node.js + Express API
-  │
-  │ DATABASE_URL
-  ▼
-PostgreSQL
-  │
-  ▼
-Docker persistent volume
+                         Client
+                           │
+                           │ HTTP requests
+                           ▼
+                  Node.js + Express API
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+              ▼            ▼            ▼
+           Supabase    Auth Middleware PostgreSQL
+          Auth / JWT        │          Database
+              │             │            │
+              └───────┬─────┘            │
+                      │                  Docker
+                      ▼
+              Protected Routes
+```
 
+### Authentication Flow
 
+```text
+User
+ │
+ ├── Sign up ───────────────► Supabase
+ │
+ ├── Login ─────────────────► Supabase
+ │                              │
+ │                              ▼
+ │                         Access Token
+ │
+ └── Protected Request
+          │
+          │ Authorization: Bearer <JWT>
+          ▼
+    Auth Middleware
+          │
+          ▼
+    Supabase getUser()
+          │
+       ┌──┴──┐
+       │     │
+    Invalid  Valid
+       │     │
+      401    ▼
+          req.user
+             │
+             ▼
+       Protected Route
+```
 
+---
 
-The API connects to PostgreSQL using the Docker Compose service name db.
+# Authentication
 
-Database
+Supabase handles user authentication while the Express API handles the application routes and authentication middleware.
 
-The application uses PostgreSQL with a database named:
+## Signup
 
-tasks
+Users can register through:
 
-The tasks table contains:
+```text
+POST /auth/signup
+```
 
-Column	Type	Description
-id	SERIAL PRIMARY KEY	Unique task ID
-title	TEXT	Task title
-done	BOOLEAN	Task completion status
-created_at	TIMESTAMP	Time the task was created
-updated_at	TIMESTAMP	Time the task was last updated
+The endpoint expects:
 
-When the application starts, the repository:
+```json
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+```
 
-Connects to PostgreSQL using DATABASE_URL.
-Creates the tasks table if it does not exist.
-Inserts three example tasks only if the table is empty.
+Successful registration returns:
 
-The seed tasks are only inserted when the table contains no tasks. Existing data is not replaced when the application restarts.
+```text
+201 Created
+```
 
-Environment Variables
+Missing email or password returns:
 
-Database configuration is provided through the DATABASE_URL environment variable.
+```text
+400 Bad Request
+```
 
-Create a .env file using .env.example as a template:
+---
 
+## Login
+
+Users can log in through:
+
+```text
+POST /auth/login
+```
+
+Example request:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+```
+
+Successful authentication returns:
+
+```text
+200 OK
+```
+
+with an access token and refresh token:
+
+```json
+{
+  "access_token": "JWT...",
+  "refresh_token": "..."
+}
+```
+
+Invalid credentials return:
+
+```text
+401 Unauthorized
+```
+
+---
+
+## JWT Authentication
+
+Protected endpoints require an access token in the HTTP `Authorization` header:
+
+```text
+Authorization: Bearer <access_token>
+```
+
+The reusable `authMiddleware.js` middleware:
+
+1. Checks that the Authorization header exists.
+2. Extracts the Bearer token.
+3. Sends the token to Supabase for verification.
+4. Rejects invalid or expired tokens.
+5. Attaches the verified user to `req.user`.
+6. Allows the request to continue to the protected route.
+
+This middleware is reused by all protected endpoints instead of duplicating authentication code.
+
+---
+
+# Environment Variables
+
+Create a `.env` file using `.env.example` as a template.
+
+```env
 DATABASE_URL=postgres://postgres:dev@localhost:5432/tasks
 
-The real .env file is ignored by Git and should not be committed.
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_KEY=your_supabase_publishable_or_anon_key
+```
 
-When the application runs inside Docker Compose, the API uses:
+The Supabase key used by this project is the **publishable/anon key**, not the `service_role` key.
 
-postgres://postgres:dev@db:5432/tasks
+### Security
 
-The hostname is db because db is the PostgreSQL service name inside the Docker Compose network.
+The real `.env` file contains secrets and must **never be committed to Git**.
 
-Running the Application
+The repository contains `.env.example` with placeholder values instead.
 
-The complete application stack can be started with one command:
+```text
+.env          → local secrets, ignored by Git
+.env.example  → safe template, committed to Git
+```
 
+---
+
+# Running the Application
+
+After cloning the repository:
+
+```bash
+git clone https://github.com/ashpokkk/CRUD_API.git
+cd CRUD_API
+```
+
+Create your environment file:
+
+```bash
+cp .env.example .env
+```
+
+Add your own PostgreSQL and Supabase values to `.env`.
+
+Start the complete application stack:
+
+```bash
 docker compose up -d
+```
 
-Check the services:
+Check the running services:
 
+```bash
 docker compose ps
+```
 
 The API will be available at:
 
+```text
 http://localhost:3000
+```
 
-Swagger documentation is available at:
+Swagger documentation:
 
+```text
 http://localhost:3000/docs
+```
 
-To stop the stack:
+To stop the application:
 
+```bash
 docker compose down
-API Endpoints
-Method	Endpoint	Description
-GET	/	API information
-GET	/health	Check API health
-GET	/tasks	Retrieve all tasks
-GET	/tasks/:id	Retrieve a single task
-POST	/tasks	Create a new task
-PUT	/tasks/:id	Update an existing task
-DELETE	/tasks/:id	Delete a task
-HTTP Status Codes
-200 — Successful read/update
-201 — Task successfully created
-204 — Task successfully deleted
-400 — Invalid request
-404 — Task not found
-Example Requests
-Get all tasks
-curl -i http://localhost:3000/tasks
+```
 
-Example response:
+---
 
-[
-  {
-    "id": 1,
-    "title": "Read Quran",
-    "done": true
-  },
-  {
-    "id": 2,
-    "title": "Push up day workout",
-    "done": false
-  },
-  {
-    "id": 3,
-    "title": "Give fifi a bath",
-    "done": false
-  }
-]
-Create a task
-curl -X POST http://localhost:3000/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Learn PostgreSQL"}'
-Update a task
-curl -X PUT http://localhost:3000/tasks/1 \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Learn PostgreSQL properly","done":true}'
-Delete a task
-curl -i -X DELETE http://localhost:3000/tasks/1
-PostgreSQL Persistence
+# API Reference
 
-The PostgreSQL database uses a Docker volume named:
+| Method | Endpoint               | Description                         | Authentication |
+| ------ | ---------------------- | ----------------------------------- | -------------- |
+| GET    | `/`                    | API information                     | No             |
+| GET    | `/health`              | Check API health                    | No             |
+| GET    | `/public/info`         | Public information                  | No             |
+| GET    | `/tasks`               | Retrieve all tasks                  | No             |
+| GET    | `/tasks/:id`           | Retrieve a task by ID               | No             |
+| POST   | `/tasks`               | Create a task                       | No             |
+| PUT    | `/tasks/:id`           | Update a task                       | No             |
+| DELETE | `/tasks/:id`           | Delete a task                       | No             |
+| POST   | `/auth/signup`         | Register a user                     | No             |
+| POST   | `/auth/login`          | Log in a user                       | No             |
+| GET    | `/protected/profile`   | Retrieve authenticated user profile | **Yes**        |
+| GET    | `/protected/dashboard` | Access protected dashboard          | **Yes**        |
+| POST   | `/auth/logout`         | Log out authenticated user          | **Yes**        |
 
+Protected endpoints require:
+
+```text
+Authorization: Bearer <access_token>
+```
+
+---
+
+# HTTP Status Codes
+
+| Status | Meaning                                     |
+| ------ | ------------------------------------------- |
+| 200    | Successful request                          |
+| 201    | Resource successfully created               |
+| 204    | Successful request with no response body    |
+| 400    | Invalid or missing request data             |
+| 401    | Missing, invalid, or expired authentication |
+| 404    | Resource not found                          |
+
+---
+
+# Swagger UI
+
+Interactive API documentation is available at:
+
+```text
+http://localhost:3000/docs
+```
+
+Swagger UI provides an interactive interface for viewing and testing the API.
+
+Protected endpoints are marked with a **lock icon** and use the configured Bearer JWT security scheme.
+
+The **Authorize** button allows an access token obtained from `/auth/login` to be entered once and reused when testing protected endpoints.
+
+## Swagger Overview
+
+![Swagger UI overview](./Swagger_auth.png)
+
+## Swagger Bearer Authentication
+
+![Swagger Authorize dialog](./swagger_get_dashboard.png)
+
+## Protected Profile Request
+
+![Swagger protected profile](./swagger_get_protected.png)
+
+---
+
+# Database
+
+The application uses PostgreSQL for persistent task storage.
+
+The database is named:
+
+```text
+tasks
+```
+
+The `tasks` table contains:
+
+| Column       | Type               | Description            |
+| ------------ | ------------------ | ---------------------- |
+| `id`         | SERIAL PRIMARY KEY | Unique task ID         |
+| `title`      | TEXT               | Task title             |
+| `done`       | BOOLEAN            | Task completion status |
+| `created_at` | TIMESTAMP          | Task creation time     |
+| `updated_at` | TIMESTAMP          | Last update time       |
+
+When the application starts, the repository:
+
+1. Connects to PostgreSQL using `DATABASE_URL`.
+2. Creates the `tasks` table if it does not exist.
+3. Inserts three example tasks only when the table is empty.
+4. Preserves existing data when the application restarts.
+
+---
+
+# PostgreSQL Persistence
+
+PostgreSQL runs in Docker and uses a persistent Docker volume named:
+
+```text
 taskdata
+```
 
 The volume allows database data to survive when the containers are stopped and recreated.
 
 For example:
 
+```bash
 docker compose down
 docker compose up -d
+```
 
-Tasks created before the restart remain available after the application starts again.
+Tasks created before the restart remain available.
 
-This was tested by creating a task, stopping the entire Compose stack, starting it again, and confirming that the task was still present.
+---
 
-SQL and Repository
+# SQL and Repository
 
-All PostgreSQL database operations are kept inside the repository module.
+PostgreSQL database operations are kept inside the repository module.
 
-CRUD operations use SQL statements:
+The repository uses:
 
-SELECT — retrieve tasks
-INSERT — create tasks
-UPDATE — modify tasks
-DELETE — remove tasks
+* `SELECT` for retrieving tasks
+* `INSERT` for creating tasks
+* `UPDATE` for modifying tasks
+* `DELETE` for removing tasks
 
-Queries use parameterized placeholders such as $1, $2, and $3 instead of directly inserting user input into SQL statements.
+Queries use parameterized placeholders such as:
 
-Swagger Documentation
+```text
+$1
+$2
+$3
+```
 
-Interactive API documentation is available through Swagger UI:
+instead of directly inserting user input into SQL statements.
 
-http://localhost:3000/docs
+This helps prevent SQL injection.
 
-Swagger provides an interactive interface for viewing and testing the available API endpoints.
+---
 
-Database Evidence
+# Project Structure
 
-PostgreSQL can be inspected directly inside the database container:
-
-docker compose exec db psql -U postgres -d tasks
-
-List the tables:
-
-\dt
-
-View the stored tasks:
-
-SELECT * FROM tasks;
-
-The database was verified to contain the tasks table and the seeded task data.
-
-Project Structure
+```text
 CRUD/
 │
 ├── server.js
+├── supabase.js
+├── authMiddleware.js
 ├── postgres.js
 ├── postgresRepository.js
 ├── swagger.js
+│
 ├── Dockerfile
 ├── compose.yaml
 ├── init.sql
+│
 ├── .env.example
 ├── .gitignore
 ├── .dockerignore
+│
 ├── package.json
 ├── package-lock.json
+│
 ├── README.md
-├── image.png
-└── database-screenshot.png
-One-Command Setup
+│
+├── Swagger_auth.png
+├── swagger_get_protected.png
+├── swagger_get_dashboard.png
+│
+└── tasks.db
+```
 
-After cloning the repository:
+---
 
-git clone https://github.com/ashpokkk/CRUD_API.git
-cd CRUD_API
-cp .env.example .env
-docker compose up -d
+# Security
 
-The API and PostgreSQL database will start together without requiring manual database setup.
+The project follows several basic security practices:
 
-Repository
+* Supabase publishable/anon key is used instead of the `service_role` key.
+* `.env` is excluded from Git.
+* `.env.example` contains placeholders instead of secrets.
+* Authentication tokens are verified through Supabase.
+* Protected routes use reusable authentication middleware.
+* SQL queries use parameterized values.
+* Invalid or expired JWTs are rejected with `401 Unauthorized`.
+
+---
+
+# Repository
 
 GitHub repository:
 
 https://github.com/ashpokkk/CRUD_API
 
-
-### One small adjustment
-
-I used:
-
-```markdown
-![PostgreSQL database screenshot](./PostgresSQL(Docker Desktop).png)
+The repository contains the complete Node.js API, PostgreSQL/Docker setup, Supabase authentication integration, Swagger documentation, and staged development history.
