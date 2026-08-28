@@ -36,6 +36,19 @@ app.get('/public/info', (req, res) => {
 });
 
 
+/**
+ * @swagger
+ * /protected/profile:
+ *   get:
+ *     summary: Get authenticated user's profile
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile
+ *       401:
+ *         description: Invalid or missing access token
+ */
 app.get('/protected/profile', authMiddleware, (req, res) => {
     res.status(200).json({
         id: req.user.id,
@@ -45,6 +58,19 @@ app.get('/protected/profile', authMiddleware, (req, res) => {
 });
 
 
+/**
+ * @swagger
+ * /protected/dashboard:
+ *   get:
+ *     summary: Get protected dashboard
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard response
+ *       401:
+ *         description: Invalid or missing access token
+ */
 app.get('/protected/dashboard', authMiddleware, (req, res) => {
     res.status(200).json({
         message: "Welcome to your dashboard",
@@ -214,6 +240,35 @@ app.post('/auth/signup', async (req, res) => {
 });
 
 
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Log in a user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 example: user@example.com
+ *               password:
+ *                 type: string
+ *                 example: password123
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       400:
+ *         description: Email and password are required
+ *       401:
+ *         description: Invalid login credentials
+ */
 app.post('/auth/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -241,6 +296,19 @@ app.post('/auth/login', async (req, res) => {
 });
 
 
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Log out the authenticated user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       204:
+ *         description: Successfully logged out
+ *       401:
+ *         description: Invalid or missing access token
+ */
 app.post('/auth/logout', authMiddleware, async (req, res) => {
     const { error } = await supabase.auth.signOut();
 
