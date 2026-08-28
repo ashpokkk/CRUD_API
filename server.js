@@ -1,6 +1,8 @@
 const swaggerUi = require("swagger-ui-express")
 const swaggerSpec = require("./swagger")
 const express = require('express')
+require('dotenv').config();
+const supabase = require('./supabase');
 const app = express()
 const port = 3000
 
@@ -159,6 +161,21 @@ app.delete('/tasks/:id', async (req, res) => {
     res.sendStatus(204);
 });
 
+
+async function testSupabaseConnection() {
+    const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .limit(1);
+
+    if (error) {
+        console.error('Supabase connection failed:', error.message);
+    } else {
+        console.log('Supabase connection successful!');
+    }
+}
+
+testSupabaseConnection();
 
 
 app.listen(port,()=>{
