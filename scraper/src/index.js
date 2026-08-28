@@ -93,7 +93,13 @@ async function fetchPage(pageUrl, cacheFile) {
   console.log(`Status: ${response.status}`);
 
   if (response.status !== 200) {
-    throw new Error(`Fetch failed with status ${response.status}`);
+    const error = new Error(
+      `Fetch failed with status ${response.status}`
+    );
+
+    error.status = response.status;
+
+    throw error;
   }
 
   const fetchedAt = new Date().toISOString();
@@ -177,7 +183,38 @@ function extractRawRecord(html, productUrl, sourcePage, fetchedAt) {
   };
 }
 
+async function fetchBookPage(productUrl, cacheFile) {
+  try {
+    return await fetchPage(productUrl, cacheFile);
+  } catch (error) {
+    const status = error.status;
+
+    // Never retry 404 or 403
+    if (status === 404 || status === 403) {
+      throw error;
+    }
+
+    // Retry once for timeout or 5xx
+    if (error.name === "AbortError" || (status >= 500 && status <= 599)) {
+      console.log(`RETRY ${productUrl}`);
+
+      await sleep(1000);
+
+      return await fetchPage(productUrl, cacheFile);
+    }
+
+    throw error;
+  }
+}
+
 async function main() {
+  const runStartedAt = new Date();
+  const runStartTime = Date.now();
+
+  let pagesFetched = 0;
+  let cacheHits = 0;
+  let failedPages = 0;
+
   let currentUrl = START_URL;
   let cataloguePages = 0;
   const discoveredBooks = [];
@@ -189,6 +226,12 @@ async function main() {
 
     const cacheFile = cacheFileFor(currentUrl);
     const result = await fetchPage(currentUrl, cacheFile);
+
+    if (result.fromCache) {
+      cacheHits++;
+    } else {
+      pagesFetched++;
+    }
 
     cataloguePages++;
 
@@ -210,6 +253,11 @@ async function main() {
     ).values()
   ];
 
+  uniqueBooks.push({
+    productUrl: "https://books.toscrape.com/catalogue/fake-book-for-testing/index.html",
+    sourcePage: START_URL
+  });
+
   const rawRecords = [];
 
   for (let i = 0; i < uniqueBooks.length; i++) {
@@ -221,19 +269,33 @@ async function main() {
 
     const cacheFile = detailCacheFileFor(productUrl);
 
-    const result = await fetchPage(productUrl, cacheFile);
+    try {
+      const result = await fetchBookPage(productUrl, cacheFile);
 
-    const fetchedAt =
-      result.fetchedAt || new Date().toISOString();
+      if (result.fromCache) {
+        cacheHits++;
+      } else {
+        pagesFetched++;
+      }
 
-    const record = extractRawRecord(
-      result.html,
-      productUrl,
-      sourcePage,
-      fetchedAt
-    );
+      const fetchedAt =
+        result.fetchedAt || new Date().toISOString();
 
-    rawRecords.push(record);
+      const record = extractRawRecord(
+        result.html,
+        productUrl,
+        sourcePage,
+        fetchedAt
+      );
+
+      rawRecords.push(record);
+    } catch (error) {
+      failedPages++;
+
+      console.error(
+        `FAILED ${productUrl}: ${error.message}`
+      );
+    }
   }
 
   const validRecords = [];
@@ -273,6 +335,26 @@ async function main() {
     "scraper/output/errors.json",
     JSON.stringify(errors, null, 2)
   );
+
+  const durationMs = Date.now() - runStartTime;
+
+  const runReport = {
+    start_time: runStartedAt.toISOString(),
+    duration_ms: durationMs,
+    pages_fetched: pagesFetched,
+    cache_hits: cacheHits,
+    valid_records: uniqueRecords.length,
+    invalid_records: errors.length,
+    failed_pages: failedPages
+  };
+
+  await fs.writeFile(
+    "scraper/output/run-report.json",
+    JSON.stringify(runReport, null, 2)
+  );
+
+  console.log("Run report:");
+  console.log(JSON.stringify(runReport, null, 2));
 
   console.log(`catalogue_pages=${cataloguePages}`);
   console.log(`detail_pages=${rawRecords.length}`);
