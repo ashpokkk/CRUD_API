@@ -1,5 +1,6 @@
 const fs = require("fs/promises");
 const cheerio = require("cheerio");
+const { bookSchema } = require("./schema");
 
 const START_URL = "https://books.toscrape.com/";
 const USER_AGENT =
@@ -30,6 +31,27 @@ function detailCacheFileFor(bookUrl) {
   const bookName = parts[parts.length - 2];
 
   return `scraper/cache/books-${bookName}.html`;
+}
+
+function normalizePrice(priceText) {
+  if (!priceText) {
+    return null;
+  }
+
+  const match = priceText.match(/£\s*([\d.]+)/);
+
+  if (!match) {
+    return null;
+  }
+
+  return Number(match[1]);
+}
+
+function normalizeRecord(record) {
+  return {
+    ...record,
+    price_gbp: normalizePrice(record.price_text)
+  };
 }
 
 async function fetchPage(pageUrl, cacheFile) {
@@ -214,11 +236,51 @@ async function main() {
     rawRecords.push(record);
   }
 
+  const validRecords = [];
+  const errors = [];
+
+  for (const rawRecord of rawRecords) {
+    const normalizedRecord = normalizeRecord(rawRecord);
+
+    const result = bookSchema.safeParse(normalizedRecord);
+
+    if (result.success) {
+      validRecords.push(result.data);
+    } else {
+      errors.push({
+        product_url: rawRecord.product_url,
+        reason: result.error.issues
+          .map((issue) => issue.message)
+          .join("; ")
+      });
+    }
+  }
+
+  const uniqueRecords = [
+    ...new Map(
+      validRecords.map((record) => [record.product_url, record])
+    ).values()
+  ];
+
+  await fs.mkdir("scraper/output", { recursive: true });
+
+  await fs.writeFile(
+    "scraper/output/books.json",
+    JSON.stringify(uniqueRecords, null, 2)
+  );
+
+  await fs.writeFile(
+    "scraper/output/errors.json",
+    JSON.stringify(errors, null, 2)
+  );
+
   console.log(`catalogue_pages=${cataloguePages}`);
   console.log(`detail_pages=${rawRecords.length}`);
+  console.log(`valid_records=${uniqueRecords.length}`);
+  console.log(`errors=${errors.length}`);
 
-  console.log("Sample raw record:");
-  console.log(JSON.stringify(rawRecords[0], null, 2));
+  console.log("Sample normalized record:");
+  console.log(JSON.stringify(uniqueRecords[0], null, 2));
 }
 
 main().catch((error) => {
